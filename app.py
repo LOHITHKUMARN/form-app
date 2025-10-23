@@ -1,27 +1,31 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect
 from flask_sqlalchemy import SQLAlchemy
 import os
 
 app = Flask(__name__)
 
-db_url = os.environ.get("DATABASE_URL")
-if not db_url or db_url.strip() == "":
-    print("⚠️  DATABASE_URL not found — using local SQLite instead.")
-    db_url = "sqlite:///data.db"
-elif db_url.startswith("postgres://"):
-    # Render gives an old prefix sometimes — fix it for SQLAlchemy
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
+# Get DATABASE_URL from Render environment
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
-app.config["SQLALCHEMY_DATABASE_URI"] = db_url
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+if not DATABASE_URL:
+    # fallback for local testing
+    DATABASE_URL = 'sqlite:///local.db'
+
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
 # Database Model
 class Entry(db.Model):
+    __tablename__ = 'entry'  # ensures table name is 'entry'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100))
-    email = db.Column(db.String(120))
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+
+# Create tables if they don't exist
+with app.app_context():
+    db.create_all()
 
 @app.route('/')
 def index():
@@ -29,11 +33,16 @@ def index():
 
 @app.route('/submit', methods=['POST'])
 def submit():
-    name = request.form['name']
-    email = request.form['email']
+    name = request.form.get('name')
+    email = request.form.get('email')
+
+    if not name or not email:
+        return "Name and email are required!", 400
+
     new_entry = Entry(name=name, email=email)
     db.session.add(new_entry)
     db.session.commit()
+
     return render_template('success.html', name=name)
 
 @app.route('/entries')
@@ -42,7 +51,5 @@ def entries():
     return '<br>'.join([f"{e.name} - {e.email}" for e in all_entries])
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()  # ✅ ensures the table exists
-    app.run(debug=True)
-
+    # For local testing
+    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
