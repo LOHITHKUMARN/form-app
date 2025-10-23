@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: simple-form
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: form-db
+          property: connectionString
+
+databases:
+  - name: form-db
+    plan: free
