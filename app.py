@@ -1,11 +1,16 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request
 from flask_sqlalchemy import SQLAlchemy
 import os
 
 app = Flask(__name__)
 
-# Render provides DATABASE_URL environment variable
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+# ✅ Use DATABASE_URL if provided (Render cloud DB)
+# Otherwise fall back to a local SQLite file
+db_url = os.environ.get('DATABASE_URL')
+if not db_url:
+    db_url = 'sqlite:///data.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -35,4 +40,6 @@ def entries():
     return '<br>'.join([f"{e.name} - {e.email}" for e in all_entries])
 
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()  # ✅ ensures the table exists
     app.run(debug=True)
