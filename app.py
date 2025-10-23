@@ -1,16 +1,14 @@
-from flask import Flask, render_template, request, redirect, send_file
+from flask import Flask, render_template, request, redirect, send_file, Response
 from flask_sqlalchemy import SQLAlchemy
 import os
 import csv
-from io import StringIO
+import io
 
 app = Flask(__name__)
 
-# Get DATABASE_URL from Render environment
+# DATABASE_URL from Render
 DATABASE_URL = os.environ.get('DATABASE_URL')
-
 if not DATABASE_URL:
-    # fallback for local testing
     DATABASE_URL = 'sqlite:///local.db'
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
@@ -20,7 +18,7 @@ db = SQLAlchemy(app)
 
 # Database Model
 class Entry(db.Model):
-    __tablename__ = 'entry'  # ensures table name is 'entry'
+    __tablename__ = 'entry'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), nullable=False)
@@ -29,12 +27,10 @@ class Entry(db.Model):
 with app.app_context():
     db.create_all()
 
-# Home page
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# Form submission
 @app.route('/submit', methods=['POST'])
 def submit():
     name = request.form.get('name')
@@ -49,36 +45,33 @@ def submit():
 
     return render_template('success.html', name=name)
 
-# View all entries (browser-friendly)
 @app.route('/entries')
 def entries():
     all_entries = Entry.query.all()
-    if not all_entries:
-        return "No entries found."
-    return '<br>'.join([f"{e.id} | {e.name} | {e.email}" for e in all_entries])
+    return '<br>'.join([f"{e.name} - {e.email}" for e in all_entries])
 
-# Export entries as CSV (downloadable)
 @app.route('/export_csv')
 def export_csv():
-    all_entries = Entry.query.all()
-    if not all_entries:
-        return "No entries to export."
+    try:
+        all_entries = Entry.query.all()
+        if not all_entries:
+            return "No entries to export.", 200
 
-    # Use in-memory CSV
-    si = StringIO()
-    writer = csv.writer(si)
-    writer.writerow(['ID', 'Name', 'Email'])
-    for e in all_entries:
-        writer.writerow([e.id, e.name, e.email])
-    si.seek(0)
+        # Create CSV in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['ID', 'Name', 'Email'])
+        for entry in all_entries:
+            writer.writerow([entry.id, entry.name, entry.email])
 
-    return send_file(
-        si,
-        mimetype='text/csv',
-        as_attachment=True,
-        download_name='entries.csv'
-    )
+        output.seek(0)
+        return Response(
+            output,
+            mimetype="text/csv",
+            headers={"Content-Disposition": "attachment;filename=entries.csv"}
+        )
+    except Exception as e:
+        return f"Error generating CSV: {e}", 500
 
 if __name__ == '__main__':
-    # For local testing
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
