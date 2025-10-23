@@ -4,14 +4,16 @@ import os
 
 app = Flask(__name__)
 
-# ✅ Use DATABASE_URL if provided (Render cloud DB)
-# Otherwise fall back to a local SQLite file
-db_url = os.environ.get('DATABASE_URL')
-if not db_url:
-    db_url = 'sqlite:///data.db'
-app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+db_url = os.environ.get("DATABASE_URL")
+if not db_url or db_url.strip() == "":
+    print("⚠️  DATABASE_URL not found — using local SQLite instead.")
+    db_url = "sqlite:///data.db"
+elif db_url.startswith("postgres://"):
+    # Render gives an old prefix sometimes — fix it for SQLAlchemy
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
 
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
 
@@ -43,3 +45,4 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # ✅ ensures the table exists
     app.run(debug=True)
+
