@@ -7,7 +7,7 @@ A simple Flask web application to collect user information (name and email) and 
 ## Live Site
 
 - [Form Submission](https://form-app2-3.onrender.com)  
-- [View Entries](https://form-app2-3.onrender.com/export_csv)
+- [View Entries](https://form-app2-3.onrender.com/e_csv)
 
 ---
 
